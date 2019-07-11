@@ -48,7 +48,7 @@ func subscribeForAckEvents(r *SmppRoute) error  {
 		}()
 
 
-	}, stan.StartWithLastReceived(), stan.DurableName(fmt.Sprintf("%s_send_ack")),
+	}, stan.StartWithLastReceived(), stan.DurableName(fmt.Sprintf("%s_send_ack", r.ID())),
 		stan.SetManualAckMode(), stan.AckWait(aw), stan.MaxInflight(50))
 
 	if err != nil{
@@ -98,7 +98,7 @@ func subscribeForDLREvents(r *SmppRoute) error  {
 
 		}()
 
-	}, stan.StartWithLastReceived(), stan.DurableName(fmt.Sprintf("%s_receive_dlr")),
+	}, stan.StartWithLastReceived(), stan.DurableName(fmt.Sprintf("%s_receive_dlr", r.ID())),
 		stan.SetManualAckMode(), stan.AckWait(aw), stan.MaxInflight(50))
 
 	if err != nil{
@@ -148,7 +148,7 @@ func subscribeForMTEvents(r *SmppRoute) error  {
 
 		}()
 
-	}, stan.StartWithLastReceived(), stan.DurableName(fmt.Sprintf("%s_receive_mt")),
+	}, stan.StartWithLastReceived(), stan.DurableName(fmt.Sprintf("%s_receive_mt", r.ID())),
 		stan.SetManualAckMode(), stan.AckWait(aw), stan.MaxInflight(50))
 
 	if err != nil{
