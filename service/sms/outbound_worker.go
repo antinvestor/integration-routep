@@ -1,0 +1,129 @@
+package sms
+
+import (
+	"encoding/json"
+	"fmt"
+	"github.com/fiorix/go-smpp/smpp"
+	"github.com/fiorix/go-smpp/smpp/pdu/pdufield"
+	"github.com/fiorix/go-smpp/smpp/pdu/pdutext"
+	"github.com/fiorix/go-smpp/smpp/pdu/pdutlv"
+	"github.com/nats-io/stan.go"
+	"time"
+)
+
+func sendOutMOMessage(route *SmppRoute, message *SMS) (ACK, error) {
+
+	var dlrLvl pdufield.DeliverySetting
+	switch route.settingDLRLevel{
+	case 2:
+		dlrLvl = pdufield.FinalDeliveryReceipt
+	case 3:
+		dlrLvl = pdufield.FailureDeliveryReceipt
+	default:
+		dlrLvl = pdufield.NoDeliveryReceipt
+	}
+
+
+	sms := smpp.ShortMessage{
+		Src:           message.From,
+		Dst:           message.To,
+		Text:          pdutext.Raw(message.Data),
+		SourceAddrNPI: route.settingSourceNpi,
+		SourceAddrTON: route.settingSourceTon,
+		DestAddrNPI:   route.settingDestinationNpi,
+		DestAddrTON:   route.settingDestinationTon,
+		Register:      dlrLvl,
+		TLVFields: pdutlv.Fields{
+			pdutlv.TagReceiptedMessageID: pdutlv.CString(message.MessageID),
+		},
+	}
+
+
+	ack := ACK{
+		From: message.From,
+		To: message.To,
+		RouteID: message.RouteID,
+		MessageID: message.MessageID,
+	}
+
+	var sm *smpp.ShortMessage
+	var err error
+
+	if route.trx != nil {
+		sm, err = route.trx.Submit(&sms)
+	} else {
+		sm, err = route.tr.Submit(&sms)
+	}
+
+	if err != nil{
+		return ack, err
+	}
+
+	if sm != nil {
+		ack.SmscID = sm.RespID()
+		//ack.SmscStatus = sm.Resp().Fields()[pdufield.ESMClass].String()
+	}
+	return ack, nil
+
+}
+
+func unSubscribeForMOEvents(route *SmppRoute) error {
+
+	if route.sendSubscription != nil {
+		err := route.sendSubscription.Unsubscribe()
+		route.sendSubscription = nil
+		route.status = "Disconnected"
+		return err
+	}
+	return nil
+}
+
+func subscribeForMOEvents(r *SmppRoute) error {
+
+	aw, _ := time.ParseDuration("60s")
+
+	if r.sendSubscription != nil {
+		if r.status == "Connected" {
+			return nil
+		} else {
+			return unSubscribeForMOEvents(r)
+		}
+	}
+
+	// Async Subscriber to send queued messages
+	subs, err := r.queue.QueueSubscribe(GetSmsSendQueueName(r.ID()), GetQueueGroup(r.ID()), func(m *stan.Msg) {
+
+		go func() {
+			message := &SMS{}
+			err := json.Unmarshal(m.Data, message)
+			if err != nil {
+				r.log.Warnf("error decoding message : %v ", err)
+				m.Ack()
+			}
+
+			messageAck, err := sendOutMOMessage(r, message)
+			if err != nil {
+				r.log.Infof("rescheduling message with id : %s for later because : %v", message.MessageID, err)
+				return
+			}
+
+			respMessage, err := json.Marshal(messageAck)
+			if err != nil {
+				return
+			}
+			r.queue.Publish(GetSmsSendAckQueueName(r.ID()), respMessage)
+
+			m.Ack()
+
+		}()
+	}, stan.StartWithLastReceived(), stan.DurableName(fmt.Sprintf("%s_send_sub")),
+		stan.SetManualAckMode(), stan.AckWait(aw), stan.MaxInflight(50))
+
+	if err != nil {
+		return err
+	}
+
+	r.sendSubscription = subs
+
+	return nil
+}

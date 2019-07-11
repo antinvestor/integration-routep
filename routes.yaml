@@ -1,0 +1,16 @@
+active_routes:
+  - test_smsc
+test_smsc:
+  host: 'smsc-sim.smscarrier.com'
+  port: '2775'
+  user: test
+  password: test
+  bindType: tranceiver
+  source_npi: 0
+  source_ton: 5
+  destination_npi: 1
+  destination_ton: 1
+  dlr_level: 3
+  sms_receive_url: https://webhook.site/7662a137-9104-48c8-ba10-215c48b4cd2e
+  sms_send_dlr_url: https://webhook.site/7662a137-9104-48c8-ba10-215c48b4cd2e
+  sms_send_ack_url: https://webhook.site/7662a137-9104-48c8-ba10-215c48b4cd2e
