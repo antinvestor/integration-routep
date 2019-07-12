@@ -15,6 +15,7 @@ RUN go install .
 RUN CGO_ENABLED=0 GOOS=linux go build -a -installsuffix cgo -ldflags '-extldflags "-static"' -o sms-route_binary .
 
 FROM scratch
+COPY --from=builder /etc/ssl/certs/ca-certificates.crt /etc/ssl/certs/
 COPY --from=builder /go/src/bitbucket.org/antinvestor/service-routep/sms-route_binary /sms-route
 WORKDIR /
 

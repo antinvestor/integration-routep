@@ -1,8 +1,7 @@
 active_routes:
   - test_smsc
 test_smsc:
-  host: 'smsc-sim.smscarrier.com'
-  port: '2775'
+  addresses: 'smsc-sim.smscarrier.com:2775,smsc-sim.smscarrier.com:2775'
   user: test
   password: test
   bindType: tranceiver

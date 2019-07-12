@@ -30,8 +30,6 @@ type SmppRoute struct {
 	receiveMessageSubscription stan.Subscription
 	receiveDLRSubscription     stan.Subscription
 
-	settingHost           string
-	settingPort           string
 	settingAddress        string
 	settingUser           string
 	settingPassword       string
@@ -204,10 +202,6 @@ func (r *SmppRoute) getSettings() {
 
 	// Obtain all the configs required to make an smpp connection
 	// These should be prefixed with route name from configs
-	r.settingHost = GetSetting(fmt.Sprintf("%s.host", r.ID()), "")
-	r.settingPort = GetSetting(fmt.Sprintf("%s.port", r.ID()), "")
-
-	r.settingAddress = fmt.Sprintf("%s:%s", r.settingHost, r.settingPort)
 
 	r.settingUser = GetSetting(fmt.Sprintf("%s.user", r.ID()), "")
 	r.settingPassword = GetSetting(fmt.Sprintf("%s.password", r.ID()), "")

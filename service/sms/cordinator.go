@@ -5,41 +5,43 @@ import (
 	"github.com/Sirupsen/logrus"
 	"github.com/nats-io/stan.go"
 	"github.com/spf13/viper"
+	"strings"
 )
 
 type DLR struct {
-	From          string
-	To            string
-	RouteID       string
-	SmscID        string
-	SmscStatus    string
-	Sub           string
-	Dlvrd         string
-	SubmittedDate string
-	DoneDate      string
-	Text          string
-	Err           string
-	SmscExtra     string
+	From       string `json:"from"`
+	To         string `json:"to"`
+	RouteID    string `json:"route_id"`
+	SmscID     string `json:"smsc_id"`
+	SmscStatus string `json:"smsc_status"`
+
+	Sub           string `json:"sub,omitempty"`
+	Dlvrd         string `json:"dlvrd,omitempty"`
+	SubmittedDate string `json:"submitted_date,omitempty"`
+	DoneDate      string `json:"done_date,omitempty"`
+	Text          string `json:"text,omitempty"`
+	Err           string `json:"err,omitempty"`
+	SmscExtra     string `json:"smsc_extra"`
 }
 
 type ACK struct {
-	From       string
-	To         string
-	MessageID  string
-	RouteID    string
-	SmscID     string
-	SmscStatus string
+	From       string `json:"from"`
+	To         string `json:"to"`
+	MessageID  string `json:"message_id"`
+	RouteID    string `json:"route_id"`
+	SmscID     string `json:"smsc_id"`
+	SmscStatus string `json:"smsc_status"`
 }
 
 type SMS struct {
-	From       string
-	To         string
-	Data       string
-	MessageID  string
-	RouteID    string
-	SmscID     string
-	SmscStatus string
-	SmscExtra  string
+	From       string `json:"from"`
+	To         string `json:"to"`
+	Data       string `json:"data"`
+	MessageID  string `json:"message_id"`
+	RouteID    string `json:"route_id,omitempty"`
+	SmscID     string `json:"smsc_id,omitempty"`
+	SmscStatus string `json:"smsc_status,omitempty"`
+	SmscExtra  string `json:"smsc_extra,omitempty"`
 }
 
 type Route interface {
@@ -49,7 +51,7 @@ type Route interface {
 }
 
 type Server struct {
-	availableRoutes map[string]Route
+	availableRoutes map[string][]Route
 	activeRoutes    []string
 }
 
@@ -63,10 +65,26 @@ func (s *Server) NewRoute(queue stan.Conn, log *logrus.Entry, route string) erro
 		return nil
 	}
 
-	log = log.WithField("Route ID", route)
+	//Allow the smpp routes to bind to multiple servers at once
+	var smppRouteSlice []Route
+	hostAddresses := GetSetting(fmt.Sprintf("%s.addresses", route), "")
+	hostAddressSlice := strings.Split(hostAddresses, ",")
 
-	smpp := SmppRoute{id: route, log: log, queue: queue, status: "Create"}
-	s.availableRoutes[route] = &smpp
+	for _, hostAddress := range hostAddressSlice {
+
+		smppRoute := SmppRoute{
+			id:             route,
+			queue:          queue,
+			status:         "Create",
+			log:            log.WithField("Route ID", route),
+			settingAddress: hostAddress,
+		}
+
+		smppRouteSlice = append(smppRouteSlice, &smppRoute)
+
+	}
+
+	s.availableRoutes[route] = smppRouteSlice
 
 	return nil
 }
@@ -101,7 +119,7 @@ func Init(queue stan.Conn, log *logrus.Entry, configFile string) (*Server, error
 	routes := viper.GetStringSlice("active_routes")
 
 	smsServer := Server{
-		availableRoutes: make(map[string]Route, len(routes)),
+		availableRoutes: make(map[string][]Route, len(routes)),
 	}
 
 	for _, route := range routes {
@@ -111,11 +129,15 @@ func Init(queue stan.Conn, log *logrus.Entry, configFile string) (*Server, error
 		}
 	}
 
-	for id, route := range smsServer.availableRoutes {
-		go func() {
-			log.Infof(" Initiating smpp route : %s ", id)
-			route.Init()
-		}()
+	for id, routesSlice := range smsServer.availableRoutes {
+
+		for _, route := range routesSlice {
+
+			go func() {
+				log.Infof(" Initiating smpp route : %s ", id)
+				route.Init()
+			}()
+		}
 	}
 
 	return &smsServer, nil

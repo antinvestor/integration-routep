@@ -61,7 +61,7 @@ func sendOutMOMessage(route *SmppRoute, message *SMS) (ACK, error) {
 
 	if sm != nil {
 		ack.SmscID = sm.RespID()
-		//ack.SmscStatus = sm.Resp().Fields()[pdufield.ESMClass].String()
+		ack.SmscStatus = "Submitted"
 	}
 	return ack, nil
 
