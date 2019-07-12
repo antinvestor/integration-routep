@@ -74,8 +74,9 @@ pipelines:
           name: Build and release to the world
           script:
             - export IMAGE_NAME=antinvestor/routep
-            - docker login -u ${DOCKERHUB_USERNAME} -p ${DOCKERHUB_PASSWORD}
-            - docker build -t ${IMAGE_NAME}:${BITBUCKET_COMMIT} -t ${IMAGE_NAME}:latest -f ./Dockerfile .
+            - export SEMANTIC_VERSION=v0.2.0
+            - docker login --username ${DOCKERHUB_USERNAME} --password ${DOCKERHUB_PASSWORD}
+            - docker build -t ${IMAGE_NAME}:${BITBUCKET_COMMIT} -t ${IMAGE_NAME}:${SEMANTIC_VERSION} -t ${IMAGE_NAME}:latest -f ./Dockerfile .
             - docker push $IMAGE_NAME            -
 
       - step:
