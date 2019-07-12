@@ -68,10 +68,10 @@ pipelines:
             - export GOOGLE_APPLICATION_CREDENTIALS=~/.gcloud-api-key.json
             - docker login -u _json_key -p "`cat ${GOOGLE_APPLICATION_CREDENTIALS}`" https://eu.gcr.io
             - docker build -t ${IMAGE_NAME}:${BITBUCKET_COMMIT} -t ${IMAGE_NAME}:latest -f ./Dockerfile .
-            - docker push $IMAGE_NAME            -
+            - docker push $IMAGE_NAME
 
       - step:
-          name: Build and release to the world
+          name: Build and release externally
           script:
             - export IMAGE_NAME=antinvestor/routep
             - export SEMANTIC_VERSION=v0.2.0
