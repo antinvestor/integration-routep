@@ -77,7 +77,7 @@ pipelines:
             - export SEMANTIC_VERSION=v0.2.0
             - docker login --username ${DOCKERHUB_USERNAME} --password ${DOCKERHUB_PASSWORD}
             - docker build -t ${IMAGE_NAME}:${BITBUCKET_COMMIT} -t ${IMAGE_NAME}:${SEMANTIC_VERSION} -t ${IMAGE_NAME}:latest -f ./Dockerfile .
-            - docker push $IMAGE_NAME            -
+            - docker push $IMAGE_NAME
 
       - step:
           name: Deploy to Production
