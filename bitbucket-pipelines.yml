@@ -5,7 +5,7 @@ pipelines:
   default:
     - step:
         name: Service testing and build
-        image: golang:1.12
+        image: golang:1.13
         script:
           - go get -u github.com/golang/dep/cmd/dep
           - mkdir -p /go/src/bitbucket.org/antinvestor/${BITBUCKET_REPO_SLUG}
@@ -19,7 +19,7 @@ pipelines:
 
       - step:
           name: Service testing and build
-          image: golang:1.12
+          image: golang:1.13
           script:
             - go get -u github.com/golang/dep/cmd/dep
             - mkdir -p /go/src/bitbucket.org/antinvestor/${BITBUCKET_REPO_SLUG}
@@ -51,7 +51,7 @@ pipelines:
 
       - step:
           name: Service testing and build
-          image: golang:1.12
+          image: golang:1.13
           script:
             - go get -u github.com/golang/dep/cmd/dep
             - mkdir -p /go/src/bitbucket.org/antinvestor/${BITBUCKET_REPO_SLUG}
@@ -74,7 +74,7 @@ pipelines:
           name: Build and release externally
           script:
             - export IMAGE_NAME=antinvestor/routep
-            - export SEMANTIC_VERSION=v0.2.0
+            - export SEMANTIC_VERSION=v0.2.1
             - docker login --username ${DOCKERHUB_USERNAME} --password ${DOCKERHUB_PASSWORD}
             - docker build -t ${IMAGE_NAME}:${BITBUCKET_COMMIT} -t ${IMAGE_NAME}:${SEMANTIC_VERSION} -t ${IMAGE_NAME}:latest -f ./Dockerfile .
             - docker push $IMAGE_NAME
