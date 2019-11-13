@@ -1,12 +1,13 @@
 package service
 
 import (
-	"bitbucket.org/antinvestor/service-routep/service/sms"
+	"antinvestor.com/service/routep/service/sms"
 	"context"
 	"fmt"
-	"github.com/Sirupsen/logrus"
+	"github.com/sirupsen/logrus"
 	"github.com/gorilla/handlers"
 	"github.com/nats-io/stan.go"
+	"github.com/InVisionApp/go-health/v2"
 	"net/http"
 	"os"
 	"os/signal"
@@ -40,6 +41,7 @@ func (se StatusError) Status() int {
 type Env struct {
 	Queue      stan.Conn
 	Logger     *logrus.Entry
+	Health   		*health.Health
 	ConfigFile string
 	ServerPort string
 }

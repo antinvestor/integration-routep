@@ -1,22 +1,21 @@
-FROM golang:1.12 as builder
+FROM golang:1.13 as builder
 
-RUN go get github.com/golang/dep/cmd/dep
-WORKDIR /go/src/bitbucket.org/antinvestor/service-routep
+# Add Maintainer Info
+LABEL maintainer="Bwire Peter <bwire517@gmail.com>"
 
-ADD Gopkg.* ./
-RUN dep ensure --vendor-only
+WORKDIR /
 
-# Copy the local package files to the container's workspace.
+ADD go.mod ./
+
+RUN go mod download
+
 ADD . .
-
-# Build the service command inside the container.
-RUN go install .
 
 RUN CGO_ENABLED=0 GOOS=linux go build -a -installsuffix cgo -ldflags '-extldflags "-static"' -o sms-route_binary .
 
 FROM scratch
 COPY --from=builder /etc/ssl/certs/ca-certificates.crt /etc/ssl/certs/
-COPY --from=builder /go/src/bitbucket.org/antinvestor/service-routep/sms-route_binary /sms-route
+COPY --from=builder /sms-route_binary /sms-route
 WORKDIR /
 
 # Run the service command by default when the container starts.

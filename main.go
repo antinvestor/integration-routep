@@ -1,8 +1,8 @@
 package main
 
 import (
-	"bitbucket.org/antinvestor/service-routep/service"
-	"bitbucket.org/antinvestor/service-routep/utils"
+	"antinvestor.com/service/routep/service"
+	"antinvestor.com/service/routep/utils"
 	"log"
 	"os"
 	"time"
@@ -24,18 +24,25 @@ func main() {
 
 	defer traceCloser.Close()
 
-	queue, err := utils.ConfigureQueue(logger)
+	queue, queueChecker, err := utils.ConfigureQueue(logger)
 	if err != nil {
-		logger.Warnf("Configuring Queue experienced an error: %v", err)
+		logger.Warnf("Configuring StanQueue experienced an error: %v", err)
 		os.Exit(1)
 	}
 	defer queue.Close()
+
+	healthChecker, err := utils.ConfigureHealthChecker(logger, queueChecker)
+	if err != nil {
+		logger.Warnf("Error configuring health checks: %v", err)
+	}
+
 
 	logger.Infof("Initiating the service at %v", time.Now())
 
 	env := service.Env{
 		Queue:      queue,
 		Logger:     logger,
+		Health:     healthChecker,
 		ServerPort: utils.GetEnv("SERVER_PORT", "7000"),
 	}
 

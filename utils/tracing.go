@@ -27,7 +27,7 @@ func ConfigureJuegler(applicationService string) (io.Closer, error) {
 		},
 	}
 
-	// Example logger and metrics factory. Use github.com/uber/jaeger-client-go/log
+	// Example logger and metrics factory. Use github.com/uber/jaeger-connection-go/log
 	// and github.com/uber/jaeger-lib/metrics respectively to bind to real logging and metrics
 	// frameworks.
 	jLogger := jaegerlog.StdLogger

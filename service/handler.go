@@ -1,12 +1,13 @@
 package service
 
 import (
-	"bitbucket.org/antinvestor/service-routep/service/sms"
+	"antinvestor.com/service/routep/service/sms"
+	"antinvestor.com/service/routep/utils"
 	"encoding/json"
 	"errors"
-	"github.com/Sirupsen/logrus"
 	"github.com/gorilla/mux"
 	"github.com/opentracing/opentracing-go"
+	"github.com/sirupsen/logrus"
 	"github.com/thedevsaddam/govalidator"
 
 	"net/http"
@@ -119,7 +120,7 @@ func SendSms(env *Env, w http.ResponseWriter, r *http.Request) error {
 		return StatusError{400, err}
 	}
 
-	err = env.Queue.Publish( sms.GetSmsSendQueueName(message.RouteID), binMessage)
+	err = env.Queue.Publish(sms.GetSmsSendQueueName(message.RouteID), binMessage)
 	if err != nil {
 		return StatusError{500, err}
 	}
@@ -137,12 +138,11 @@ func Healthz(env *Env, w http.ResponseWriter, r *http.Request) error {
 	span, _ := opentracing.StartSpanFromContext(r.Context(), "healthz")
 	defer span.Finish()
 
-	if env.Queue.NatsConn().IsConnected(){
-		w.Header().Set("Content-Type", "application/json; charset=UTF-8")
-		w.WriteHeader(http.StatusOK)
-		w.Write([]byte("Queue is active"))
-		return nil
-	}
+	status, body := utils.HealthCheckProcessing(env.Logger, env.Health)
 
-	return StatusError{500, errors.New("Queue is not active")}
+	w.Header().Set("Content-Type", "application/json; charset=UTF-8")
+	w.WriteHeader(status)
+	w.Write(body)
+	return nil
+
 }

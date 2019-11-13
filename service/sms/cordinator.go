@@ -2,7 +2,7 @@ package sms
 
 import (
 	"fmt"
-	"github.com/Sirupsen/logrus"
+	"github.com/sirupsen/logrus"
 	"github.com/nats-io/stan.go"
 	"github.com/spf13/viper"
 	"strings"
