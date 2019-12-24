@@ -32,6 +32,7 @@ func subscribeForAckEvents(r *SmppRoute) error  {
 			resp, err := http.Post(r.settingSmsSendAckUrl, "application/json", bytes.NewBuffer(m.Data))
 			if err != nil{
 				r.log.WithError(err).Warnf("error occurred on attempting ack webhook")
+				return
 			}
 
 			if resp.StatusCode >= http.StatusOK && resp.StatusCode < http.StatusNonAuthoritativeInfo {
@@ -83,6 +84,7 @@ func subscribeForDLREvents(r *SmppRoute) error  {
 			resp, err := http.Post(r.settingSmsSendDLRUrl, "application/json", bytes.NewBuffer(m.Data))
 			if err != nil{
 				r.log.WithError(err).Warnf("error occurred on attempting dlr webhook")
+				return
 			}
 
 			if resp.StatusCode >= http.StatusOK && resp.StatusCode < http.StatusNonAuthoritativeInfo {
@@ -133,6 +135,7 @@ func subscribeForMTEvents(r *SmppRoute) error  {
 			resp, err := http.Post(r.settingSmsReceiveUrl, "application/json", bytes.NewBuffer(m.Data))
 			if err != nil{
 				r.log.WithError(err).Warnf("error occurred on attempting MT webhook")
+				return
 			}
 
 			if resp.StatusCode >= http.StatusOK && resp.StatusCode < http.StatusNonAuthoritativeInfo {
