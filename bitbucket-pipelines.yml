@@ -5,7 +5,7 @@ pipelines:
   default:
     - step:
         name: Service testing and build
-        image: golang:1.13
+        image: golang:1.14
         script:
           - go mod download
           - go mod tidy

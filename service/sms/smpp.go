@@ -44,6 +44,8 @@ type SmppRoute struct {
 	settingSmsSendAckUrl string
 	settingSmsSendDLRUrl string
 	settingSmsReceiveUrl string
+
+	settingDisableTLVTrackingID bool
 }
 
 func (r *SmppRoute) ID() string {
@@ -211,7 +213,7 @@ func (r *SmppRoute) getSettings() {
 	srcNpi := GetSetting(fmt.Sprintf("%s.source_npi", r.ID()), "0")
 
 	sett, err := strconv.ParseUint(srcNpi, 10, 8)
-	if err == nil {
+	if err != nil {
 		sett = 0
 	}
 	r.settingSourceNpi = uint8(sett)
@@ -219,7 +221,7 @@ func (r *SmppRoute) getSettings() {
 	srcTon := GetSetting(fmt.Sprintf("%s.source_ton", r.ID()), "5")
 
 	sett, err = strconv.ParseUint(srcTon, 10, 8)
-	if err == nil {
+	if err != nil {
 		sett = 5
 	}
 	r.settingSourceTon = uint8(sett)
@@ -227,7 +229,7 @@ func (r *SmppRoute) getSettings() {
 	destNpi := GetSetting(fmt.Sprintf("%s.destination_npi", r.ID()), "1")
 
 	sett, err = strconv.ParseUint(destNpi, 10, 8)
-	if err == nil {
+	if err != nil {
 		sett = 1
 	}
 	r.settingDestinationNpi = uint8(sett)
@@ -235,7 +237,7 @@ func (r *SmppRoute) getSettings() {
 	destTon := GetSetting(fmt.Sprintf("%s.destination_ton", r.ID()), "1")
 
 	sett, err = strconv.ParseUint(destTon, 10, 8)
-	if err == nil {
+	if err != nil {
 		sett = 1
 	}
 	r.settingDestinationTon = uint8(sett)
@@ -243,7 +245,7 @@ func (r *SmppRoute) getSettings() {
 	dlrLvl := GetSetting(fmt.Sprintf("%s.dlr_level", r.ID()), "3")
 
 	sett, err = strconv.ParseUint(dlrLvl, 10, 8)
-	if err == nil {
+	if err != nil {
 		sett = 8
 	}
 	r.settingDLRLevel = uint8(sett)
@@ -251,6 +253,13 @@ func (r *SmppRoute) getSettings() {
 	r.settingSmsReceiveUrl = GetSetting(fmt.Sprintf("%s.sms_receive_url", r.ID()), "")
 	r.settingSmsSendDLRUrl = GetSetting(fmt.Sprintf("%s.sms_send_dlr_url", r.ID()), "")
 	r.settingSmsSendAckUrl = GetSetting(fmt.Sprintf("%s.sms_send_ack_url", r.ID()), "")
+
+	disableTlv := GetSetting(fmt.Sprintf("%s.disable_tlv_options", r.ID()), "False")
+	settTlv, err := strconv.ParseBool(disableTlv)
+	if err != nil {
+		settTlv = false
+	}
+	r.settingDisableTLVTrackingID = settTlv
 
 }
 

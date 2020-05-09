@@ -33,12 +33,13 @@ func sendOutMOMessage(route *SmppRoute, message *SMS) (ACK, error) {
 		DestAddrNPI:   route.settingDestinationNpi,
 		DestAddrTON:   route.settingDestinationTon,
 		Register:      dlrLvl,
-		TLVFields: pdutlv.Fields{
-			pdutlv.TagReceiptedMessageID: pdutlv.CString(message.MessageID),
-		},
+
 	}
-
-
+	if ! route.settingDisableTLVTrackingID {
+		sms.TLVFields = pdutlv.Fields{
+			pdutlv.TagReceiptedMessageID: pdutlv.CString(message.MessageID),
+		}
+	}
 	ack := ACK{
 		From: message.From,
 		To: message.To,
