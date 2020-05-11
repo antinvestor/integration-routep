@@ -46,6 +46,7 @@ type SmppRoute struct {
 	settingSmsReceiveUrl string
 
 	settingDisableTLVTrackingID bool
+	settingSmsCDeliveryRate uint64
 }
 
 func (r *SmppRoute) ID() string {
@@ -261,6 +262,11 @@ func (r *SmppRoute) getSettings() {
 	}
 	r.settingDisableTLVTrackingID = settTlv
 
+	smscDeliveryRate := GetSetting(fmt.Sprintf("%s.smsc_delivery_rate", r.ID()), "50")
+	r.settingSmsCDeliveryRate, err = strconv.ParseUint(smscDeliveryRate, 10, 8)
+	if err != nil {
+		r.settingSmsCDeliveryRate = 50
+	}
 }
 
 func startSmppConnection(r *SmppRoute) error {

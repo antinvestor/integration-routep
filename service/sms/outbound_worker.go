@@ -118,7 +118,7 @@ func subscribeForMOEvents(r *SmppRoute) error {
 
 		}()
 	}, stan.StartWithLastReceived(), stan.DurableName(fmt.Sprintf("%s_send_sub", r.ID())),
-		stan.SetManualAckMode(), stan.AckWait(aw), stan.MaxInflight(50))
+		stan.SetManualAckMode(), stan.AckWait(aw), stan.MaxInflight(int(r.settingSmsCDeliveryRate)))
 
 	if err != nil {
 		return err
