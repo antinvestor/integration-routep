@@ -73,7 +73,6 @@ func unSubscribeForMOEvents(route *SmppRoute) error {
 	if route.sendSubscription != nil {
 		err := route.sendSubscription.Unsubscribe()
 		route.sendSubscription = nil
-		route.status = "Disconnected"
 		return err
 	}
 	return nil
@@ -84,7 +83,7 @@ func subscribeForMOEvents(r *SmppRoute) error {
 	aw, _ := time.ParseDuration("60s")
 
 	if r.sendSubscription != nil {
-		if r.status == "Connected" {
+		if r.IsActive() {
 			return nil
 		} else {
 			return unSubscribeForMOEvents(r)
