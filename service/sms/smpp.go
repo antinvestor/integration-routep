@@ -12,13 +12,13 @@ import (
 )
 
 type SmppRoute struct {
-	id     string
-	status string
-	active bool
-	log    *logrus.Entry
-	queue  stan.Conn
-
-	txConn <-chan smpp.ConnStatus
+	id         string
+	status     string
+	active     bool
+	log        *logrus.Entry
+	queue      stan.Conn
+	exitSignal chan int
+	txConn     <-chan smpp.ConnStatus
 
 	trx *smpp.Transceiver
 	tr  *smpp.Transmitter
@@ -47,6 +47,10 @@ type SmppRoute struct {
 	settingSmsCDeliveryRate     uint64
 
 	settingOperatesSynchronously bool
+}
+
+func (r *SmppRoute) Stop() {
+	r.exitSignal <- 1
 }
 
 func (r *SmppRoute) ID() string {
@@ -103,9 +107,12 @@ func (r *SmppRoute) Init() {
 		err := r.Run()
 		if err != nil {
 			r.log.WithError(err).Warnf("SubRoute stopping error occurred, app will reattempt connection in 2 minutes")
+			<-time.After(5 * time.Minute)
+		}else{
+			r.log.Info("Exiting route gracefully")
 		}
 
-		<-time.After(5 * time.Minute)
+
 
 	}
 
@@ -282,6 +289,11 @@ func (r *SmppRoute) startSmppConnection() error {
 				break
 
 			}
+
+
+		case <- r.exitSignal:
+			r.log.Info("Received an exit signal ")
+			return nil
 		}
 
 	}

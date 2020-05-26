@@ -107,7 +107,7 @@ func SendSms(env *Env, w http.ResponseWriter, r *http.Request) error {
 		return StatusError{400, errors.New(string(err))}
 	}
 
-	message := sms.SMS{
+	messageMO := sms.SMS{
 		From:      r.FormValue("from"),
 		To:        r.FormValue("to"),
 		Data:      r.FormValue("data"),
@@ -115,19 +115,25 @@ func SendSms(env *Env, w http.ResponseWriter, r *http.Request) error {
 		RouteID:   r.FormValue("route_id"),
 	}
 
-	binMessage, err := json.Marshal(message)
-	if err != nil {
-		return StatusError{400, err}
-	}
+	smsRoute := env.SMSServer.GetRoute(messageMO.RouteID)
 
-	err = env.Queue.Publish(sms.GetSmsSendQueueName(message.RouteID), binMessage)
+	ack, err := smsRoute.SendMOMessage( &messageMO)
 	if err != nil {
 		return StatusError{500, err}
 	}
 
+	message := []byte("Queued")
+	if ack != nil{
+
+		message, err = json.Marshal(ack)
+		if err != nil {
+			return StatusError{500, err}
+		}
+	}
+
 	w.Header().Set("Content-Type", "application/json; charset=UTF-8")
 	w.WriteHeader(http.StatusCreated)
-	w.Write([]byte("Queued"))
+	_, _ = w.Write(message)
 	return nil
 
 }

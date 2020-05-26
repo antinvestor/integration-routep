@@ -1,11 +1,15 @@
 package sms
 
 import (
+	"encoding/json"
+	"errors"
 	"fmt"
-	"github.com/sirupsen/logrus"
 	"github.com/nats-io/stan.go"
+	"github.com/sirupsen/logrus"
 	"github.com/spf13/viper"
+	"math/rand"
 	"strings"
+	"time"
 )
 
 type DLR struct {
@@ -45,27 +49,28 @@ type SMS struct {
 }
 
 type Route struct {
-	id string
-	synchronous bool
+	id        string
+	queue     stan.Conn
 	subRoutes []SubRoute
-
 }
 
-func (r *Route) ID() string  {
+func (r *Route) ID() string {
 	return r.id
 }
 
 // IsActive
 //only returns true immediately after initialization if it is working asynchronousl otherwise
 //it activates when one of its subroutes becomes active
-func (r *Route) IsActive() bool  {
+func (r *Route) IsActive() bool {
 
-	if r.hasQueue(){
+	if r.CanQueue() {
 		return true
-	}else{
+	} else {
 
-		for _, subRoute := range r.subRoutes{
-			subRoute.IsActive()
+		for _, subRoute := range r.subRoutes {
+			if subRoute.IsActive() {
+				return true
+			}
 		}
 
 		return false
@@ -73,23 +78,63 @@ func (r *Route) IsActive() bool  {
 
 }
 
-
-func (r *Route) hasQueue() bool{
-	return !r.synchronous
+func (r *Route) CanQueue() bool {
+	if len(r.subRoutes) > 0 {
+		return r.subRoutes[0].CanQueue()
+	}
+	return false
 }
 
-func (r *Route) init(log *logrus.Entry)  {
+func (r *Route) SendMOMessage(message *SMS) (*ACK, error) {
+
+	if r.CanQueue() {
+
+		binMessage, err := json.Marshal(message)
+		if err != nil {
+			return nil, err
+		}
+
+		err = r.queue.Publish(GetSmsSendQueueName(message.RouteID), binMessage)
+		if err != nil {
+			return nil, err
+		}
+
+		return nil, nil
+	}
+
+	if len(r.subRoutes) == 0 || !r.IsActive() {
+		return nil, errors.New("can't route message without external network connection")
+	}
+
+	if len(r.subRoutes) == 1 {
+		return r.subRoutes[0].SendMOMessage(message)
+	}
+
+	for i := 0; i < len(r.subRoutes)*2; i++ {
+		s := rand.NewSource(time.Now().Unix())
+		randomSeed := rand.New(s) // initialize local pseudorandom generator
+		randomIndex := randomSeed.Intn(len(r.subRoutes))
+
+		if r.subRoutes[randomIndex].IsActive() {
+			return r.subRoutes[randomIndex].SendMOMessage(message)
+		}
+	}
+
+	return nil, errors.New("can't route message as no active routes were determined")
+
+}
+
+func (r *Route) init(log *logrus.Entry) {
 	for _, subRoute := range r.subRoutes {
 		log.Infof(" Initiating sub route : %s ", r.ID())
 		go subRoute.Init()
 	}
 }
 
-func (r *Route) Submit( )  {
-
-
-
-
+func (r *Route) Stop() {
+	for _, subRoute := range r.subRoutes {
+		subRoute.Stop()
+	}
 }
 
 type SubRoute interface {
@@ -97,42 +142,56 @@ type SubRoute interface {
 	Init()
 	Status() string
 	IsActive() bool
+	CanQueue() bool
+	SendMOMessage(message *SMS) (*ACK, error)
+	Stop()
 }
 
 type Server struct {
 	availableRoutes map[string]*Route
 }
 
-func (s *Server) Stop() {
-
+func (s *Server) GetRoute(id string) *Route {
+	if route, ok := s.availableRoutes[id]; ok {
+		return route
+	} else {
+		return nil
+	}
 }
 
-func (s *Server) NewRoute(queue stan.Conn, log *logrus.Entry, route string) error {
+func (s *Server) Stop() {
+	for _, route := range s.availableRoutes {
+		route.Stop()
+	}
+}
 
-	if s.availableRoutes[route] != nil {
+func (s *Server) newRoute(queue stan.Conn, log *logrus.Entry, routeID string) error {
+
+	if s.availableRoutes[routeID] != nil {
 		return nil
 	}
 
 	//Allow routes to bind to multiple servers at once
 	var subRouteSlice []SubRoute
-	hostAddresses := GetSetting(fmt.Sprintf("%s.addresses", route), "")
+	hostAddresses := GetSetting(fmt.Sprintf("%s.addresses", routeID), "")
 	hostAddressSlice := strings.Split(hostAddresses, ",")
 
 	for _, hostAddress := range hostAddressSlice {
 
 		smppRoute := SmppRoute{
-			id:             route,
+			id:             routeID,
 			queue:          queue,
 			status:         "Create",
-			log:            log.WithField("SubRoute ID", route),
+			log:            log.WithField("SubRoute ID", routeID),
 			settingAddress: hostAddress,
+			exitSignal:     make(chan int, 1),
 		}
 
 		subRouteSlice = append(subRouteSlice, &smppRoute)
 
 	}
 
-	s.availableRoutes[route] = &Route{route, subRouteSlice}
+	s.availableRoutes[routeID] = &Route{routeID, queue, subRouteSlice}
 
 	return nil
 }
@@ -160,7 +219,7 @@ func NewServer(queue stan.Conn, log *logrus.Entry) (*Server, error) {
 	viper.SetConfigName("routes")
 	viper.AddConfigPath(".")
 	err := viper.ReadInConfig() // Find and read the config file
-	if err != nil { // Handle errors reading the config file
+	if err != nil {             // Handle errors reading the config file
 		return nil, err
 	}
 
@@ -171,7 +230,7 @@ func NewServer(queue stan.Conn, log *logrus.Entry) (*Server, error) {
 	}
 
 	for _, route := range routes {
-		err := smsServer.NewRoute(queue, log, route)
+		err := smsServer.newRoute(queue, log, route)
 		if err != nil {
 			return nil, err
 		}

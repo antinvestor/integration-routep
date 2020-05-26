@@ -11,7 +11,7 @@ import (
 	"time"
 )
 
-func (r *SmppRoute) processMOMessage(message *SMS) (ACK, error) {
+func (r *SmppRoute) SendMOMessage(message *SMS) (*ACK, error) {
 
 	var dlrLvl pdufield.DeliverySetting
 	switch r.settingDLRLevel{
@@ -57,14 +57,14 @@ func (r *SmppRoute) processMOMessage(message *SMS) (ACK, error) {
 	}
 
 	if err != nil{
-		return ack, err
+		return &ack, err
 	}
 
 	if sm != nil {
 		ack.SmscID = sm.RespID()
 		ack.SmscStatus = "Submitted"
 	}
-	return ack, nil
+	return &ack, nil
 
 }
 
@@ -105,7 +105,7 @@ func subscribeForMOEvents(r *SmppRoute) error {
 				}
 			}
 
-			messageAck, err := r.processMOMessage(message)
+			messageAck, err := r.SendMOMessage(message)
 			if err != nil {
 				r.log.Infof("rescheduling message with id : %s for later because : %v", message.MessageID, err)
 				return

@@ -10,7 +10,7 @@ import (
 	"time"
 )
 
-func (r *SmppRoute) processAckEvent(messageAck ACK, queue bool) error {
+func (r *SmppRoute) processAckEvent(messageAck *ACK, queue bool) error {
 
 	message, err := json.Marshal(messageAck)
 	if err != nil {
