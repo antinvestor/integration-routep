@@ -140,7 +140,6 @@ func (r *Route) Stop() {
 type SubRoute interface {
 	ID() string
 	Init()
-	Status() string
 	IsActive() bool
 	CanQueue() bool
 	SendMOMessage(message *SMS) (*ACK, error)
@@ -151,9 +150,9 @@ type Server struct {
 	availableRoutes map[string]*Route
 }
 
-func (s *Server)IsActive() bool {
-	for _, route := range s.availableRoutes{
-		if route.IsActive(){
+func (s *Server) IsActive() bool {
+	for _, route := range s.availableRoutes {
+		if route.IsActive() {
 			return true
 		}
 	}
@@ -191,9 +190,9 @@ func (s *Server) newRoute(queue stan.Conn, log *logrus.Entry, routeID string) er
 		smppRoute := SmppRoute{
 			id:             routeID,
 			queue:          queue,
-			status:         "Create",
 			log:            log.WithField("SubRoute ID", routeID),
 			settingAddress: hostAddress,
+			active:         false,
 			exitSignal:     make(chan int, 1),
 		}
 

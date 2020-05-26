@@ -13,7 +13,6 @@ import (
 
 type SmppRoute struct {
 	id         string
-	status     string
 	active     bool
 	log        *logrus.Entry
 	queue      stan.Conn
@@ -100,7 +99,6 @@ func (r *SmppRoute) SmscHandler(p pdu.Body) {
 func (r *SmppRoute) Init() {
 
 	r.log.Infof("Starting up smpp routes %v", r.ID())
-	r.status = "NewServer"
 	r.getSettings()
 
 	for {
@@ -136,9 +134,6 @@ func (r *SmppRoute) Run() error {
 
 }
 
-func (r *SmppRoute) Status() string {
-	return r.status
-}
 
 func (r *SmppRoute) getSettings() {
 
@@ -287,24 +282,28 @@ func (r *SmppRoute) startSmppConnection() error {
 				if err != nil {
 					r.log.Warnf("Error happened when initiating messages sending %v ", err)
 				}
+				r.active = true
 				break
 			case smpp.Disconnected:
 				err := unSubscribeForMOEvents(r)
 				if err != nil {
 					r.log.Warnf("Error on stoping messages sending %v ", err)
 				}
+				r.active = false
 				break
 			case smpp.ConnectionFailed:
 				err := unSubscribeForMOEvents(r)
 				if err != nil {
 					r.log.Warnf("Error initiating messages sending %v ", err)
 				}
+				r.active = false
 				break
 			case smpp.BindFailed:
 				err := unSubscribeForMOEvents(r)
 				if err != nil {
 					r.log.Warnf("Error initiating messages sending %v ", err)
 				}
+				r.active = false
 				break
 
 			}
