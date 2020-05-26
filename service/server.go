@@ -56,6 +56,8 @@ func RunServer(env *Env) {
 		env.Logger.Fatalf("Service stopping due to error : %v", err)
 	}
 
+	env.SMSServer = smsServer
+
 	router := NewRouter(env)
 
 	srv := &http.Server{

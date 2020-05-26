@@ -116,6 +116,9 @@ func SendSms(env *Env, w http.ResponseWriter, r *http.Request) error {
 	}
 
 	smsRoute := env.SMSServer.GetRoute(messageMO.RouteID)
+	if smsRoute == nil{
+		return StatusError{500, errors.New("No active routes were found")}
+	}
 
 	ack, err := smsRoute.SendMOMessage(&messageMO)
 	if err != nil {

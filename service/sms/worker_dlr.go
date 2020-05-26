@@ -107,8 +107,8 @@ func subscribeForDLREvents(r *SmppRoute) error {
 
 		go func() {
 
-			messageDlr := DLR{}
-			err := json.Unmarshal(m.Data, &messageDlr)
+			messageDlr := &DLR{}
+			err := json.Unmarshal(m.Data, messageDlr)
 			if err != nil {
 				r.log.WithError(err).Errorf("error decoding message : [ %v  ] hence dropping it", m.Data)
 				err = m.Ack()
@@ -117,7 +117,7 @@ func subscribeForDLREvents(r *SmppRoute) error {
 				}
 			}
 
-			err = r.processDLRMessage(&messageDlr, false)
+			err = r.processDLRMessage(messageDlr, false)
 			if err != nil {
 				r.log.WithError(err).Errorf("error occurred when posting dlr to webhook")
 			} else {
