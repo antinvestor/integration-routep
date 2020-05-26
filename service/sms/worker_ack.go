@@ -61,8 +61,8 @@ func subscribeForAckEvents(r *SmppRoute) error {
 
 		go func() {
 
-			messageAck := ACK{}
-			err := json.Unmarshal(m.Data, &messageAck)
+			messageAck := &ACK{}
+			err := json.Unmarshal(m.Data, messageAck)
 			if err != nil {
 				r.log.WithError(err).Errorf("error decoding message : [ %v  ] hence dropping it", m.Data)
 				err = m.Ack()

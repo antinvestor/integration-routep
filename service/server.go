@@ -4,7 +4,6 @@ import (
 	"antinvestor.com/service/routep/service/sms"
 	"context"
 	"fmt"
-	"github.com/InVisionApp/go-health/v2"
 	"github.com/gorilla/handlers"
 	"github.com/nats-io/stan.go"
 	"github.com/sirupsen/logrus"
@@ -41,8 +40,8 @@ func (se StatusError) Status() int {
 type Env struct {
 	Queue      stan.Conn
 	Logger     *logrus.Entry
-	Health     *health.Health
 	SMSServer  *sms.Server
+	ServiceName string
 	ConfigFile string
 	ServerPort string
 }

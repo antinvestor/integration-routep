@@ -2,13 +2,12 @@ package service
 
 import (
 	"antinvestor.com/service/routep/service/sms"
-	"antinvestor.com/service/routep/utils"
 	"encoding/json"
 	"errors"
 	"github.com/gorilla/mux"
-	"github.com/opentracing/opentracing-go"
 	"github.com/sirupsen/logrus"
 	"github.com/thedevsaddam/govalidator"
+	"go.opentelemetry.io/otel/api/global"
 
 	"net/http"
 	"time"
@@ -74,8 +73,9 @@ func NewRouter(env *Env) *mux.Router {
 // SendSms -
 func SendSms(env *Env, w http.ResponseWriter, r *http.Request) error {
 
-	span, _ := opentracing.StartSpanFromContext(r.Context(), "SendSms")
-	defer span.Finish()
+	tracer := global.Tracer(env.ServiceName)
+	span, _ := tracer.Start(r.Context(), "SendSms")
+	defer span.Done()
 
 	rules := govalidator.MapData{
 		"from":       []string{"required", "max:20"},
@@ -117,13 +117,13 @@ func SendSms(env *Env, w http.ResponseWriter, r *http.Request) error {
 
 	smsRoute := env.SMSServer.GetRoute(messageMO.RouteID)
 
-	ack, err := smsRoute.SendMOMessage( &messageMO)
+	ack, err := smsRoute.SendMOMessage(&messageMO)
 	if err != nil {
 		return StatusError{500, err}
 	}
 
 	message := []byte("Queued")
-	if ack != nil{
+	if ack != nil {
 
 		message, err = json.Marshal(ack)
 		if err != nil {
@@ -141,14 +141,20 @@ func SendSms(env *Env, w http.ResponseWriter, r *http.Request) error {
 // Healthz -
 func Healthz(env *Env, w http.ResponseWriter, r *http.Request) error {
 
-	span, _ := opentracing.StartSpanFromContext(r.Context(), "healthz")
-	defer span.Finish()
+	tracer := global.Tracer(env.ServiceName)
+	span, _ := tracer.Start(r.Context(), "healthz")
+	defer span.Done()
 
-	status, body := utils.HealthCheckProcessing(env.Logger, env.Health)
+	msg := "ok"
+	statusCode := http.StatusOK
+	if !env.SMSServer.IsActive() {
+		msg = "failed"
+		statusCode = http.StatusInternalServerError
+	}
 
 	w.Header().Set("Content-Type", "application/json; charset=UTF-8")
-	w.WriteHeader(status)
-	w.Write(body)
+	w.WriteHeader(statusCode)
+	w.Write([]byte(msg))
 	return nil
 
 }

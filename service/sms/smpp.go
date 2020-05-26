@@ -146,9 +146,15 @@ func (r *SmppRoute) getSettings() {
 	// These should be prefixed with route name from configs
 
 	r.settingUser = GetSetting(fmt.Sprintf("%s.user", r.ID()), "")
+	r.log.Infof("Route [%v] setting :  settingUser = %s", r.ID(), r.settingUser)
+
 	r.settingPassword = GetSetting(fmt.Sprintf("%s.password", r.ID()), "")
+
 	r.settingBindType = GetSetting(fmt.Sprintf("%s.bindType", r.ID()), "transceiver")
+	r.log.Infof("Route [%v] setting :  settingBindType = %s", r.ID(), r.settingBindType)
+
 	r.settingSystemType = GetSetting(fmt.Sprintf("%s.systemType", r.ID()), "")
+	r.log.Infof("Route [%v] setting :  settingSystemType = %s", r.ID(), r.settingSystemType)
 
 	srcNpi := GetSetting(fmt.Sprintf("%s.source_npi", r.ID()), "0")
 
@@ -157,6 +163,7 @@ func (r *SmppRoute) getSettings() {
 		sett = 0
 	}
 	r.settingSourceNpi = uint8(sett)
+	r.log.Infof("Route [%v] setting :  settingSourceNpi = %d", r.ID(), r.settingSourceNpi)
 
 	srcTon := GetSetting(fmt.Sprintf("%s.source_ton", r.ID()), "5")
 
@@ -165,6 +172,7 @@ func (r *SmppRoute) getSettings() {
 		sett = 5
 	}
 	r.settingSourceTon = uint8(sett)
+	r.log.Infof("Route [%v] setting :  settingSourceTon = %d", r.ID(), r.settingSourceTon)
 
 	destNpi := GetSetting(fmt.Sprintf("%s.destination_npi", r.ID()), "1")
 
@@ -173,6 +181,7 @@ func (r *SmppRoute) getSettings() {
 		sett = 1
 	}
 	r.settingDestinationNpi = uint8(sett)
+	r.log.Infof("Route [%v] setting :  settingDestinationNpi = %d", r.ID(), r.settingDestinationNpi)
 
 	destTon := GetSetting(fmt.Sprintf("%s.destination_ton", r.ID()), "1")
 
@@ -181,6 +190,7 @@ func (r *SmppRoute) getSettings() {
 		sett = 1
 	}
 	r.settingDestinationTon = uint8(sett)
+	r.log.Infof("Route [%v] setting :  settingDestinationTon = %d", r.ID(), r.settingDestinationTon)
 
 	dlrLvl := GetSetting(fmt.Sprintf("%s.dlr_level", r.ID()), "3")
 
@@ -189,10 +199,16 @@ func (r *SmppRoute) getSettings() {
 		sett = 8
 	}
 	r.settingDLRLevel = uint8(sett)
+	r.log.Infof("Route [%v] setting :  settingDLRLevel = %d", r.ID(), r.settingDLRLevel)
 
 	r.settingSmsReceiveUrl = GetSetting(fmt.Sprintf("%s.sms_receive_url", r.ID()), "")
+	r.log.Infof("Route [%v] setting :  settingSmsReceiveUrl = %s", r.ID(), r.settingSmsReceiveUrl)
+
 	r.settingSmsSendDLRUrl = GetSetting(fmt.Sprintf("%s.sms_send_dlr_url", r.ID()), "")
+	r.log.Infof("Route [%v] setting :  settingSmsSendDLRUrl = %s", r.ID(), r.settingSmsSendDLRUrl)
+
 	r.settingSmsSendAckUrl = GetSetting(fmt.Sprintf("%s.sms_send_ack_url", r.ID()), "")
+	r.log.Infof("Route [%v] setting :  settingSmsSendAckUrl = %v", r.ID(), r.settingSmsSendAckUrl)
 
 	disableTlv := GetSetting(fmt.Sprintf("%s.disable_tlv_options", r.ID()), "False")
 	settTlv, err := strconv.ParseBool(disableTlv)
@@ -200,12 +216,14 @@ func (r *SmppRoute) getSettings() {
 		settTlv = false
 	}
 	r.settingDisableTLVTrackingID = settTlv
+	r.log.Infof("Route [%v] setting :  settingDisableTLVTrackingID = %v", r.ID(), r.settingDisableTLVTrackingID)
 
 	smscDeliveryRate := GetSetting(fmt.Sprintf("%s.smsc_delivery_rate", r.ID()), "50")
 	r.settingSmsCDeliveryRate, err = strconv.ParseUint(smscDeliveryRate, 10, 8)
 	if err != nil {
 		r.settingSmsCDeliveryRate = 50
 	}
+	r.log.Infof("Route [%v] setting :  settingSmsCDeliveryRate = %d", r.ID(), r.settingSmsCDeliveryRate)
 
 	operatesSynchronously := GetSetting(fmt.Sprintf("%s.operates_synchronously", r.ID()), "True")
 	settOperatesSynchronously, err := strconv.ParseBool(operatesSynchronously)
@@ -213,6 +231,7 @@ func (r *SmppRoute) getSettings() {
 		settOperatesSynchronously = true
 	}
 	r.settingOperatesSynchronously = settOperatesSynchronously
+	r.log.Infof("Route [%v] setting :  settingOperatesSynchronously = %v", r.ID(), r.settingOperatesSynchronously)
 
 }
 

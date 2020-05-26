@@ -151,6 +151,16 @@ type Server struct {
 	availableRoutes map[string]*Route
 }
 
+func (s *Server)IsActive() bool {
+	for _, route := range s.availableRoutes{
+		if route.IsActive(){
+			return true
+		}
+	}
+
+	return false
+}
+
 func (s *Server) GetRoute(id string) *Route {
 	if route, ok := s.availableRoutes[id]; ok {
 		return route

@@ -9,7 +9,7 @@ import (
 )
 
 // ConfigureQueue StanQueue Access for environment is configured here
-func ConfigureQueue(log *logrus.Entry) (stan.Conn, *StanQueue, error) {
+func ConfigureQueue(log *logrus.Entry) (stan.Conn, error) {
 
 	queueURL := GetEnv("QUEUE_URL", nats.DefaultURL)
 
@@ -27,15 +27,15 @@ func ConfigureQueue(log *logrus.Entry) (stan.Conn, *StanQueue, error) {
 		}))
 
 	if err != nil {
-		return nil, nil,  err
+		return nil,  err
 	}
 
 	stanQueue, err := NewQue(log, nc)
 	if err != nil {
-		return nil, nil,  err
+		return nil,  err
 	}
 
-	return stanQueue.connection, stanQueue, nil
+	return stanQueue.connection, nil
 }
 
 
@@ -75,33 +75,3 @@ func NewQue(log *logrus.Entry, conn *nats.Conn) (*StanQueue, error) {
 	return &stanQueue, nil
 }
 
-// this makes sure the queue check is properly configured
-func validateQueConfig(conn stan.Conn) error {
-	if conn == nil {
-		return fmt.Errorf("A connection is required")
-	}
-
-	if conn.NatsConn() == nil  {
-		return fmt.Errorf("Underlaying connection is missing")
-	}
-
-	if !conn.NatsConn().IsConnected()  {
-		return fmt.Errorf("Available connection is not connected ")
-	}
-
-	return nil
-}
-
-// Status is used for performing a queue ping
-// the "ICheckable" interface.
-func (q *StanQueue) Status() (interface{}, error) {
-	if err := validateQueConfig(q.connection); err != nil {
-		return nil, err
-	}
-
-	if q.disconnected {
-		return nil, fmt.Errorf("our queue connection was lost")
-	}
-
-	return nil, nil
-}
