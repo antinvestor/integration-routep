@@ -51,7 +51,7 @@ func RunServer(env *Env) {
 
 	waitDuration := time.Second * 15
 
-	smsServer, err := sms.Init(env.Queue, env.Logger, env.ConfigFile)
+	smsServer, err := sms.NewServer(env.Queue, env.Logger)
 	if err != nil {
 		env.Logger.Fatalf("Service stopping due to error : %v", err)
 	}

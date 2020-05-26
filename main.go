@@ -22,7 +22,9 @@ func main() {
 		logger.Fatal("Failed to configure Juegler: " + err.Error())
 	}
 
-	defer traceCloser.Close()
+	if traceCloser != nil {
+		defer traceCloser.Close()
+	}
 
 	queue, queueChecker, err := utils.ConfigureQueue(logger)
 	if err != nil {
@@ -35,7 +37,6 @@ func main() {
 	if err != nil {
 		logger.Warnf("Error configuring health checks: %v", err)
 	}
-
 
 	logger.Infof("Initiating the service at %v", time.Now())
 

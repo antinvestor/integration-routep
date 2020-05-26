@@ -11,10 +11,10 @@ import (
 	"time"
 )
 
-func sendOutMOMessage(route *SmppRoute, message *SMS) (ACK, error) {
+func (r *SmppRoute) processMOMessage(message *SMS) (ACK, error) {
 
 	var dlrLvl pdufield.DeliverySetting
-	switch route.settingDLRLevel{
+	switch r.settingDLRLevel{
 	case 2:
 		dlrLvl = pdufield.FinalDeliveryReceipt
 	case 3:
@@ -28,14 +28,14 @@ func sendOutMOMessage(route *SmppRoute, message *SMS) (ACK, error) {
 		Src:           message.From,
 		Dst:           message.To,
 		Text:          pdutext.Raw(message.Data),
-		SourceAddrNPI: route.settingSourceNpi,
-		SourceAddrTON: route.settingSourceTon,
-		DestAddrNPI:   route.settingDestinationNpi,
-		DestAddrTON:   route.settingDestinationTon,
+		SourceAddrNPI: r.settingSourceNpi,
+		SourceAddrTON: r.settingSourceTon,
+		DestAddrNPI:   r.settingDestinationNpi,
+		DestAddrTON:   r.settingDestinationTon,
 		Register:      dlrLvl,
 
 	}
-	if ! route.settingDisableTLVTrackingID {
+	if ! r.settingDisableTLVTrackingID {
 		sms.TLVFields = pdutlv.Fields{
 			pdutlv.TagReceiptedMessageID: pdutlv.CString(message.MessageID),
 		}
@@ -50,10 +50,10 @@ func sendOutMOMessage(route *SmppRoute, message *SMS) (ACK, error) {
 	var sm *smpp.ShortMessage
 	var err error
 
-	if route.trx != nil {
-		sm, err = route.trx.Submit(&sms)
+	if r.trx != nil {
+		sm, err = r.trx.Submit(&sms)
 	} else {
-		sm, err = route.tr.Submit(&sms)
+		sm, err = r.tr.Submit(&sms)
 	}
 
 	if err != nil{
@@ -98,23 +98,27 @@ func subscribeForMOEvents(r *SmppRoute) error {
 			message := &SMS{}
 			err := json.Unmarshal(m.Data, message)
 			if err != nil {
-				r.log.Warnf("error decoding message : %v ", err)
-				m.Ack()
+				r.log.WithError(err).Errorf("error decoding message : [ %v  ] hence dropping it", m.Data)
+				err = m.Ack()
+				if err != nil{
+					r.log.WithError(err).Error("error acknowledging message")
+				}
 			}
 
-			messageAck, err := sendOutMOMessage(r, message)
+			messageAck, err := r.processMOMessage(message)
 			if err != nil {
 				r.log.Infof("rescheduling message with id : %s for later because : %v", message.MessageID, err)
 				return
 			}
 
-			respMessage, err := json.Marshal(messageAck)
+			err = r.processAckEvent(messageAck, r.CanQueue())
 			if err != nil {
-				return
+				r.log.WithError(err).Infof("failed to process ack %s hence dropping it because : %v", messageAck.MessageID, err)
 			}
-			r.queue.Publish(GetSmsSendAckQueueName(r.ID()), respMessage)
-
-			m.Ack()
+			err = m.Ack()
+			if err != nil {
+				r.log.WithError(err).Warn("error occurred on attempting acknowledge successful MO")
+			}
 
 		}()
 	}, stan.StartWithLastReceived(), stan.DurableName(fmt.Sprintf("%s_send_sub", r.ID())),

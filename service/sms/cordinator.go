@@ -44,15 +44,63 @@ type SMS struct {
 	SmscExtra  string `json:"smsc_extra,omitempty"`
 }
 
-type Route interface {
+type Route struct {
+	id string
+	synchronous bool
+	subRoutes []SubRoute
+
+}
+
+func (r *Route) ID() string  {
+	return r.id
+}
+
+// IsActive
+//only returns true immediately after initialization if it is working asynchronousl otherwise
+//it activates when one of its subroutes becomes active
+func (r *Route) IsActive() bool  {
+
+	if r.hasQueue(){
+		return true
+	}else{
+
+		for _, subRoute := range r.subRoutes{
+			subRoute.IsActive()
+		}
+
+		return false
+	}
+
+}
+
+
+func (r *Route) hasQueue() bool{
+	return !r.synchronous
+}
+
+func (r *Route) init(log *logrus.Entry)  {
+	for _, subRoute := range r.subRoutes {
+		log.Infof(" Initiating sub route : %s ", r.ID())
+		go subRoute.Init()
+	}
+}
+
+func (r *Route) Submit( )  {
+
+
+
+
+}
+
+type SubRoute interface {
 	ID() string
 	Init()
 	Status() string
+	IsActive() bool
 }
 
 type Server struct {
-	availableRoutes map[string][]Route
-	activeRoutes    []string
+	availableRoutes map[string]*Route
 }
 
 func (s *Server) Stop() {
@@ -65,8 +113,8 @@ func (s *Server) NewRoute(queue stan.Conn, log *logrus.Entry, route string) erro
 		return nil
 	}
 
-	//Allow the smpp routes to bind to multiple servers at once
-	var smppRouteSlice []Route
+	//Allow routes to bind to multiple servers at once
+	var subRouteSlice []SubRoute
 	hostAddresses := GetSetting(fmt.Sprintf("%s.addresses", route), "")
 	hostAddressSlice := strings.Split(hostAddresses, ",")
 
@@ -76,15 +124,15 @@ func (s *Server) NewRoute(queue stan.Conn, log *logrus.Entry, route string) erro
 			id:             route,
 			queue:          queue,
 			status:         "Create",
-			log:            log.WithField("Route ID", route),
+			log:            log.WithField("SubRoute ID", route),
 			settingAddress: hostAddress,
 		}
 
-		smppRouteSlice = append(smppRouteSlice, &smppRoute)
+		subRouteSlice = append(subRouteSlice, &smppRoute)
 
 	}
 
-	s.availableRoutes[route] = smppRouteSlice
+	s.availableRoutes[route] = &Route{route, subRouteSlice}
 
 	return nil
 }
@@ -107,7 +155,7 @@ func GetQueueGroup(routeID string) string {
 	return fmt.Sprintf("smpp-%s", routeID)
 }
 
-func Init(queue stan.Conn, log *logrus.Entry, configFile string) (*Server, error) {
+func NewServer(queue stan.Conn, log *logrus.Entry) (*Server, error) {
 
 	viper.SetConfigName("routes")
 	viper.AddConfigPath(".")
@@ -119,7 +167,7 @@ func Init(queue stan.Conn, log *logrus.Entry, configFile string) (*Server, error
 	routes := viper.GetStringSlice("active_routes")
 
 	smsServer := Server{
-		availableRoutes: make(map[string][]Route, len(routes)),
+		availableRoutes: make(map[string]*Route, len(routes)),
 	}
 
 	for _, route := range routes {
@@ -129,15 +177,8 @@ func Init(queue stan.Conn, log *logrus.Entry, configFile string) (*Server, error
 		}
 	}
 
-	for id, routesSlice := range smsServer.availableRoutes {
-
-		for _, route := range routesSlice {
-
-			go func() {
-				log.Infof(" Initiating smpp route : %s ", id)
-				route.Init()
-			}()
-		}
+	for _, route := range smsServer.availableRoutes {
+		route.init(log)
 	}
 
 	return &smsServer, nil

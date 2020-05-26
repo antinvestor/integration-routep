@@ -1,15 +1,12 @@
 package sms
 
 import (
-	"encoding/json"
 	"fmt"
-	"github.com/sirupsen/logrus"
 	"github.com/fiorix/go-smpp/smpp"
 	"github.com/fiorix/go-smpp/smpp/pdu"
 	"github.com/fiorix/go-smpp/smpp/pdu/pdufield"
 	"github.com/nats-io/stan.go"
-	"github.com/pkg/errors"
-	"regexp"
+	"github.com/sirupsen/logrus"
 	"strconv"
 	"time"
 )
@@ -17,6 +14,7 @@ import (
 type SmppRoute struct {
 	id     string
 	status string
+	active bool
 	log    *logrus.Entry
 	queue  stan.Conn
 
@@ -46,25 +44,21 @@ type SmppRoute struct {
 	settingSmsReceiveUrl string
 
 	settingDisableTLVTrackingID bool
-	settingSmsCDeliveryRate uint64
+	settingSmsCDeliveryRate     uint64
+
+	settingOperatesSynchronously bool
 }
 
 func (r *SmppRoute) ID() string {
 	return r.id
 }
 
-func startSendingMessages(route *SmppRoute) error {
+func (r *SmppRoute) IsActive() bool {
+	return r.active
+}
 
-	err := subscribeForMOEvents(route)
-
-	if err != nil {
-		return err
-	}
-
-	route.status = "Connected"
-
-	return nil
-
+func (r *SmppRoute) CanQueue() bool {
+	return !r.settingOperatesSynchronously
 }
 
 // Handler handles DeliverSM coming from a Transceiver SMPP connection.
@@ -77,7 +71,10 @@ func (r *SmppRoute) SmscHandler(p pdu.Body) {
 	case pdu.DeliverSMID:
 		dlr := r.parseForDlr(p.Fields())
 		dlr.RouteID = r.ID()
-		r.handleReceivedDlr(dlr)
+		err := r.processDLRMessage(dlr, r.CanQueue())
+		if err != nil {
+			r.log.WithError(err).Errorf("error occurred post processing dlr")
+		}
 		break
 	case pdu.DataSMID:
 		f := p.Fields()
@@ -89,88 +86,23 @@ func (r *SmppRoute) SmscHandler(p pdu.Body) {
 			SmscID:  f[pdufield.MessageID].String(),
 			RouteID: r.ID(),
 		}
-		r.handleReceivedMessage(message)
-	}
-}
-
-func (r *SmppRoute) handleReceivedMessage(message *SMS) {
-
-	respMessage, err := json.Marshal(message)
-	if err != nil {
-		r.log.Errorf("Could not encode sms : %v hence dropping it", message)
-		return
-	}
-	err = r.queue.Publish(GetSmsReceiveQueueName(message.RouteID), respMessage)
-	if err != nil {
-		r.log.Errorf("Messages %v was just lost", message)
-	}
-
-}
-
-func (r *SmppRoute) handleReceivedDlr(dlr *DLR) {
-
-	dlrMessage, err := json.Marshal(dlr)
-	if err != nil {
-		r.log.Errorf("Could not encode sms : %v hence dropping it", dlr)
-		return
-	}
-
-	err = r.queue.Publish(GetSmsSendDLRQueueName(dlr.RouteID), dlrMessage)
-	if err != nil {
-		r.log.Errorf("DLR %v was just lost", dlr)
-	}
-}
-
-func (r *SmppRoute) parseForDlr(fields pdufield.Map) *DLR {
-
-	dlrText := fields[pdufield.ShortMessage].String()
-
-	dlr := &DLR{
-		From:      fields[pdufield.SourceAddr].String(),
-		To:        fields[pdufield.DestinationAddr].String(),
-		SmscID:    fields[pdufield.SMDefaultMsgID].String(),
-		SmscExtra: dlrText,
-	}
-
-	regex := regexp.MustCompile(`id:(?P<id>.*) sub:(?P<sub>.*) dlvrd:(?P<dlvrd>.*) submit date:(?P<submitdate>.*) done date:(?P<donedate>.*) stat:(?P<stat>.*) err:(?P<err>.*) text:(?P<text>.*)`)
-	match := regex.FindStringSubmatch(dlrText)
-
-	for i, name := range match {
-		switch regex.SubexpNames()[i] {
-		case "id":
-			dlr.SmscID = name
-		case "sub":
-			dlr.Sub = name
-		case "dlvrd":
-			dlr.Dlvrd = name
-		case "submitdate":
-			dlr.SubmittedDate = name
-		case "donedate":
-			dlr.DoneDate = name
-		case "stat":
-			dlr.SmscStatus = name
-		case "err":
-			dlr.Err = name
-		case "text":
-			dlr.Err = name
-
+		err := r.processMTMessage(message, r.CanQueue())
+		if err != nil {
+			r.log.WithError(err).Errorf("error occurred post processing inbound message")
 		}
 	}
-
-
-	return dlr
 }
 
 func (r *SmppRoute) Init() {
 
 	r.log.Infof("Starting up smpp routes %v", r.ID())
-	r.status = "Init"
+	r.status = "NewServer"
 	r.getSettings()
 
 	for {
 		err := r.Run()
 		if err != nil {
-			r.log.WithError(err).Warnf("Route stopping error occurred, app will reattempt connection in 2 minutes")
+			r.log.WithError(err).Warnf("SubRoute stopping error occurred, app will reattempt connection in 2 minutes")
 		}
 
 		<-time.After(5 * time.Minute)
@@ -193,7 +125,7 @@ func (r *SmppRoute) Run() error {
 	if err != nil {
 		return err
 	}
-	return startSmppConnection(r)
+	return r.startSmppConnection()
 
 }
 
@@ -267,9 +199,17 @@ func (r *SmppRoute) getSettings() {
 	if err != nil {
 		r.settingSmsCDeliveryRate = 50
 	}
+
+	operatesSynchronously := GetSetting(fmt.Sprintf("%s.operates_synchronously", r.ID()), "True")
+	settOperatesSynchronously, err := strconv.ParseBool(operatesSynchronously)
+	if err != nil {
+		settOperatesSynchronously = true
+	}
+	r.settingOperatesSynchronously = settOperatesSynchronously
+
 }
 
-func startSmppConnection(r *SmppRoute) error {
+func (r *SmppRoute) startSmppConnection() error {
 
 	var connStat <-chan smpp.ConnStatus
 
@@ -302,46 +242,48 @@ func startSmppConnection(r *SmppRoute) error {
 		break
 	}
 
-	for c := range connStat {
+	for {
+		select {
 
-		if err := c.Error(); err != nil {
-			r.log.Warnf("Smsc connection has error : %v", err)
-			continue
-		}
+		case c := <-connStat:
 
-		r.log.Infof("Smsc updated status : %v", c.Status())
+			if err := c.Error(); err != nil {
+				r.log.Warnf("Smsc connection has error : %v", err)
+				continue
+			}
 
-		switch c.Status() {
-		case smpp.Connected:
-			err := startSendingMessages(r)
-			if err != nil {
-				r.log.Warnf("Error happened when initiating messages sending %v ", err)
-			}
-			break
-		case smpp.Disconnected:
-			err := unSubscribeForMOEvents(r)
-			if err != nil {
-				r.log.Warnf("Error on stoping messages sending %v ", err)
-			}
-			break
-		case smpp.ConnectionFailed:
-			err := unSubscribeForMOEvents(r)
-			if err != nil {
-				r.log.Warnf("Error initiating messages sending %v ", err)
-			}
-			break
-		case smpp.BindFailed:
-			err := unSubscribeForMOEvents(r)
-			if err != nil {
-				r.log.Warnf("Error initiating messages sending %v ", err)
-			}
-			break
+			r.log.Infof("Smsc updated status : %v", c.Status())
 
+			switch c.Status() {
+			case smpp.Connected:
+
+				err := subscribeForMOEvents(r)
+				if err != nil {
+					r.log.Warnf("Error happened when initiating messages sending %v ", err)
+				}
+				break
+			case smpp.Disconnected:
+				err := unSubscribeForMOEvents(r)
+				if err != nil {
+					r.log.Warnf("Error on stoping messages sending %v ", err)
+				}
+				break
+			case smpp.ConnectionFailed:
+				err := unSubscribeForMOEvents(r)
+				if err != nil {
+					r.log.Warnf("Error initiating messages sending %v ", err)
+				}
+				break
+			case smpp.BindFailed:
+				err := unSubscribeForMOEvents(r)
+				if err != nil {
+					r.log.Warnf("Error initiating messages sending %v ", err)
+				}
+				break
+
+			}
 		}
 
 	}
-
-	r.status = "Disconnected"
-	return errors.New("SMPP connection could not be setup")
 
 }
