@@ -63,9 +63,9 @@ func RunServer(env *Env) {
 	srv := &http.Server{
 		Addr: fmt.Sprintf("0.0.0.0:%s", env.ServerPort),
 		// Good practice to set timeouts to avoid Slowloris attacks.
-		WriteTimeout: time.Second * 15,
-		ReadTimeout:  time.Second * 15,
-		IdleTimeout:  time.Second * 60,
+		WriteTimeout: time.Second * 150,
+		ReadTimeout:  time.Second * 150,
+		IdleTimeout:  time.Second * 180,
 		Handler:      handlers.RecoveryHandler()(router), // Pass our instance of gorilla/mux in.
 	}
 
