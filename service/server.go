@@ -7,6 +7,7 @@ import (
 	"github.com/gorilla/handlers"
 	"github.com/nats-io/stan.go"
 	"github.com/sirupsen/logrus"
+	"golang.org/x/time/rate"
 	"net/http"
 	"os"
 	"os/signal"
@@ -46,6 +47,19 @@ type Env struct {
 	ServerPort string
 }
 
+var limiter = rate.NewLimiter(25, 50)
+
+func limit(next http.Handler) http.Handler {
+	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if limiter.Allow() == false {
+			http.Error(w, http.StatusText(429), http.StatusTooManyRequests)
+			return
+		}
+
+		next.ServeHTTP(w, r)
+	})
+}
+
 //RunServer Starts a server and waits on it
 func RunServer(env *Env) {
 
@@ -65,7 +79,7 @@ func RunServer(env *Env) {
 		// Good practice to set timeouts to avoid Slowloris attacks.
 		WriteTimeout: time.Second * 150,
 		ReadTimeout:  time.Second * 150,
-		IdleTimeout:  time.Second * 180,
+		IdleTimeout:  time.Second * 240,
 		Handler:      handlers.RecoveryHandler()(router), // Pass our instance of gorilla/mux in.
 	}
 

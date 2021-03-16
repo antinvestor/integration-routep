@@ -56,7 +56,7 @@ func addHandler(env *Env, router *mux.Router,
 	})
 	loggedHandler := Logger(handler, name, env.Logger)
 
-	router.Methods(method).Path(path).Name(name).Handler(loggedHandler)
+	router.Methods(method).Path(path).Name(name).Handler(limit(loggedHandler))
 
 }
 
@@ -116,7 +116,7 @@ func SendSms(env *Env, w http.ResponseWriter, r *http.Request) error {
 	}
 
 	smsRoute := env.SMSServer.GetRoute(messageMO.RouteID)
-	if smsRoute == nil{
+	if smsRoute == nil {
 		return StatusError{500, errors.New("No active routes were found")}
 	}
 
